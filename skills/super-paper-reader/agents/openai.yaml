@@ -1,0 +1,4 @@
+interface:
+  display_name: "Super Paper Reader｜超级论文阅读"
+  short_description: "沿原术语与算法阶段讲透方法，以问题串起领域脉络和实验证据，生成离线精读网页"
+  default_prompt: "使用 $super-paper-reader 沿原章节讲透这篇论文：先用自然中文讲清每一步为何必要，再引入原术语与原公式，结合原图和教学例子走通算法；交代领域位置，以问题分析实验证据，生成离线HTML并保留底稿。"

@@ -1,0 +1,16 @@
+# Reading results and renderer state stay local.
+outputs/
+**/.paper-reading-renderer/
+examples/*.html
+node_modules/
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+# Local agent configuration and credentials are not part of this repository.
+.codex/
+.dsh/
+.agents/
+.env
+.env.*
+!.env.example

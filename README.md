@@ -1,205 +1,145 @@
 # Super Paper Reader · 超级论文阅读
 
-一个支持 **Codex** 和 **DeepSeek Harness（DSH）** 的论文讲解 skill。输入论文链接或本地 PDF，让 agent 阅读原文、核对图表，生成适合连续阅读的中文精读网页。
+把一个研究论文变成一篇**可以连续听下来的中文长文讲解稿**（Markdown）。它逐节、逐图、
+逐表、逐公式地讲清楚一篇论文，而不是写一篇摘要。
 
-重点是讲清“为什么需要这一步、具体怎样算、结果又交给谁”，并保留论文自己的术语与数学符号。
+**只支持 DeepSeek Harness（DSH）安装。**
 
 ## 最终会得到什么
 
 ```text
-outputs/<paper-slug>/
-├── <paper-slug>.html   # 阅读成品：目录、原图、教学图和离线数学
-├── <paper-slug>.md     # 可继续修改的底稿
-└── assets/            # 从当前论文整理的图片
+<论文所在目录>/
+└── 讲解稿/
+    └── <论文短名>_讲解稿.md
 ```
 
-HTML 内嵌图片及数学资源，可以离线打开并单独发送；论文来源等外部链接仍需联网。Markdown 和图片保留在本地，方便之后修订。
+- **长度**：每页 PDF 约 400–800 个中文字；15–25 页的论文大约 10,000–16,000 字。三千字
+  的稿子说明写成了摘要，需要重写。
+- **结构**：沿用论文自己的章节标题（逐字照抄，包括原始大小写，不改名、不调序、不合并），
+  论文没有的章节不凭空补标题。
+- **覆盖**：每张图（含编号与页码）、每个独立公式（论文不给公式编号也算）、每张承载结论的
+  表格。表格要读出关键单元格，只说「结果列在表七里」不算讲到。
+- **溯源**：正文里带「论文第X页的图Y」「附录 L」这类定位锚点，头条数字要能追到某个单元格。
+- **不编造**：论文没给的数字就说没给；为了演示而举的数字会当场声明是讲解者自己举的例子。
+- **公式**：所有公式都写在 `$…$`（行内）或 `$$…$$`（独立成行）里；符号表用 Markdown 表格，
+  且每个符号单元格都是 `$…$`。
+- **风格**：讲解腔的连续长文，一段一段讲，不是要点清单；每个关键机制配一个不改变结构的类比。
 
-全文沿实际论文主章节展开：相关工作交代问题如何演进及本文位置；Method 内部只设“1. 方法概述”和“2. 具体实现”，结合主图与问题建模后，以连续段落走通实现；实验以问题展开，说明对照、设计、实施、图表结果及有依据的原因。材料不足时会说明范围，不补造论文没有的事实。
+## 它不是什么
+
+| 你想要 | 请用 |
+| --- | --- |
+| 简短的通俗精读笔记、批判性深读 | `paper-reading` |
+| 全文双语翻译与来源对照 | `nature-reader` |
+| 固定 16 节的 Paper Card | `nature-paper-card` |
+| 正式审稿意见 | `nature-reviewer` |
+| 同一份讲稿的网页版 | `paper-lecture-html` |
+| **论文讲解稿（本仓库）** | `super-paper-reader` |
 
 ## 环境要求
 
-- 已安装并配置好 Codex 或 DeepSeek Harness。
-- **Node.js 20 或以上**，用于安装脚本和 HTML 渲染。运行 `node --version` 检查。
-- agent 能读取文件、执行命令，以及阅读 PDF 和查看图表。链接输入还需要宿主允许联网获取论文。
-- 使用 Git 克隆，或下载 GitHub 的 ZIP 后解压。
-
-渲染器和所需库已随包提供，**不需要运行 `npm install`**。这个仓库提供 skill，不替代 agent，也不提供模型服务或 API key；实际阅读使用宿主已配置的模型及工具。
+- 已安装并配置 **DeepSeek Harness**（这是唯一支持的宿主）。
+- **Python 3**，用于 PDF 提取、图表测绘与覆盖核对脚本。
+- **PyMuPDF**（`pip install pymupdf`）：把 PDF 页面渲染成图片给模型看，以及在没有图像识读
+  能力时做图表结构测绘。装了它提取质量也更好。
+- `pdftotext` / `pdftoppm`（poppler-utils）：没有 PyMuPDF 时的后备提取方式。
+- agent 需要能读文件、执行命令，并且**能看图片**——图里的面板布局、曲线、坐标刻度只能看图
+  得到，不能从文本猜。
+- 安装脚本需要 **Node.js 20 或以上**；不想装 Node 就按下面方式二手动复制。
 
 ## 安装
 
-### 1. 获取仓库
-
-克隆仓库，或下载 ZIP，解压后在仓库根目录打开终端。
+### 方式一：安装脚本
 
 ```bash
 git clone https://github.com/chaotan2003/super-paper-reader.git
 cd super-paper-reader
+
+# 用户级安装：$DSH_HOME/skills，未设置 DSH_HOME 时用 ~/.dsh/skills
+node scripts/install.mjs
+
+# 只装给某个项目
+node scripts/install.mjs --project "/path/to/your/project"
+
+# 先看看会装到哪里，不写任何文件
+node scripts/install.mjs --dry-run
+
+# 覆盖已有同名 skill（旧版本会先移到备份目录）
+node scripts/install.mjs --replace
 ```
 
-### 2. 选择安装对象
+| 选项 | 作用 |
+| --- | --- |
+| （不加） | 用户级：`$DSH_HOME/skills/super-paper-reader`，未设置 `DSH_HOME` 时 `~/.dsh/skills/super-paper-reader` |
+| `--project <root>` | 项目级：`<项目根>/.dsh/skills/super-paper-reader` |
+| `--dir <skills 父目录>` | 自行指定技能父目录，与 `--project` 互斥 |
+| `--replace` | 覆盖前把旧版本移到 `.super-paper-reader-backups/` |
+| `--dry-run` | 只打印目标路径 |
+| `--help` | 打印用法 |
 
-Windows PowerShell、macOS 和 Linux 使用相同命令：
+脚本只复制 `skills/super-paper-reader/`，不复制仓库历史、README 和开发目录，不修改全局
+配置，不启动后台服务，不联网下载。
+
+### 方式二：手动复制
 
 ```bash
-# 安装到 Codex
-node scripts/install.mjs --target codex
-
-# 或安装到 DeepSeek Harness
-node scripts/install.mjs --target dsh
-
-# 或同时安装到两者
-node scripts/install.mjs --target both
+cp -r skills/super-paper-reader ~/.dsh/skills/
 ```
 
-安装脚本只复制 `skills/super-paper-reader/`，不复制仓库历史、README 或开发目录，不修改全局配置、不启动服务。
+设置了 `DSH_HOME` 时复制到 `$DSH_HOME/skills/`。安装完开一个新对话；技能还没出现就重启
+宿主。不要在两个位置同时保留同名 skill。
 
-| 安装对象 | 默认用户级目录 | 指定项目后的目录 |
-| --- | --- | --- |
-| Codex | `~/.agents/skills/super-paper-reader/` | `<项目根>/.agents/skills/super-paper-reader/` |
-| DSH | `~/.dsh/skills/super-paper-reader/` | `<项目根>/.dsh/skills/super-paper-reader/` |
+## 使用
 
-`~` 表示用户主目录。DSH 设置了 `DSH_HOME` 时，用户级安装改用该目录下的 `skills/`。项目安装应指向项目的 Git 仓库根目录：
-
-```bash
-node scripts/install.mjs --target both --project "/path/to/your/project"
-```
-
-只想预览安装位置，可加 `--dry-run`：
-
-```bash
-node scripts/install.mjs --target both --dry-run
-```
-
-需要自行管理技能目录，或正在使用旧版 Codex 的 `~/.codex/skills` 时，用 `--dir` 指定实际的 **skills 父目录**；此选项只支持一个安装对象。不要在新旧目录同时保留同名 skill。
-
-```bash
-node scripts/install.mjs --target codex --dir "/actual/path/to/skills"
-```
-
-安装后开启新对话；如果技能尚未出现，重启宿主。DSH 自定义组合需要启用其 filesystem skill provider 和 skill tool，默认目录由宿主扫描。
-
-安装路径依据 [Codex 官方说明](https://developers.openai.com/codex/skills/) 和 [DSH 上游 Skills 文档](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/subsystems/skills.md)。DSH 也支持共享的 `.agents/skills`；已经能在两边发现同一份 skill 时，无需再装重复副本。
-
-### Codex 的另一种安装方式
-
-也可以在 Codex 对话中让内置安装器完成安装，选择此方式就不用再运行上面的安装脚本：
+在 DSH 里从技能入口选 `super-paper-reader`，或者直接说：
 
 ```text
-$skill-installer 从 https://github.com/chaotan2003/super-paper-reader
-安装 skills/super-paper-reader。
+请使用 super-paper-reader，精读这篇论文：/path/to/paper.pdf
 ```
 
-## 使用方法
+也可以给链接或已提取的笔记。默认输出到论文旁边的 `讲解稿/` 目录，文件名
+`<论文短名>_讲解稿.md`；也可以指定目录，路径含空格时加引号。
 
-### Codex
+技能内部按五个阶段走：
 
-在对话中输入 `$super-paper-reader`，或从技能选择器中选中它，然后提供链接或 PDF：
-
-```text
-$super-paper-reader
-请精读这篇论文：https://arxiv.org/abs/论文编号
-结合原方法主图解释输入输出与计算过程，生成中文离线网页。
-```
-
-### DeepSeek Harness
-
-从宿主技能入口选择 `super-paper-reader`，或直接告诉 agent 使用它：
-
-```text
-请使用 super-paper-reader skill，精读我附上的论文PDF。
-先阅读正文与必要附录，查看原图表，再生成中文精读网页。
-```
-
-本地文件也可以直接给路径，含空格时保留引号：
-
-```text
-使用 super-paper-reader，精读 "/path/to/My Paper.pdf"。
-输出保存到 outputs/my-paper/。
-```
-
-### 修改已有精读
-
-```text
-用 super-paper-reader 更新 outputs/my-paper/my-paper.md。
-只优化Method：保留方法概述和具体实现两个标题，按原计算流程连续讲解，
-术语和数学符号与原文一致。重新生成同名HTML。
-```
-
-可指定只处理某个章节；明确的范围要求优先。源材料只有摘要时，不能生成声称已核验全文的解读。
-
-## 本地渲染与检查
-
-skill 的阅读、分析和写作由 agent 完成；渲染脚本负责把已经写好的 Markdown 转为网页。
-
-在仓库根目录运行：
-
-```bash
-# 不访问模型或论文，检查渲染环境
-npm run demo
-
-# 渲染实际底稿，图片使用相对于底稿的本地路径
-node skills/super-paper-reader/scripts/render.mjs outputs/my-paper/my-paper.md
-
-# 自定义成品路径
-node skills/super-paper-reader/scripts/render.mjs outputs/my-paper/my-paper.md --out outputs/my-paper/reading.html
-
-# 检查安装、更新保护、离线资源和渲染可迁移性
-npm test
-```
-
-示例会生成 `examples/render-demo.html`，它只演示排版，不是论文分析。渲染状态存于输出旁的 `.paper-reading-renderer/`，不会修改用户的全局渲染设置。已安装副本也能从其他工作目录运行，使用该副本中 `scripts/render.mjs` 的实际路径即可。
-
-结构和渲染测试不能替代人工核对论文事实、原图表及讲解逻辑。仓库附有 Windows、macOS、Linux 的 CI 配置，实际通过情况以 GitHub Actions 为准。
-
-## 更新与卸载
-
-更新仓库后重新安装：
-
-```bash
-git pull --ff-only
-node scripts/install.mjs --target both --replace
-```
-
-只使用一个宿主时，把 `both` 换成原来的安装对象；使用 `--project` 或 `--dir` 安装的，更新时仍带上原参数。默认拒绝覆盖；`--replace` 会先备份旧版本，终端显示备份路径。备份保存在所选 skills 父目录上一级的 `.super-paper-reader-backups/`，不参与正常技能扫描，也会保留旧副本内的本地修改。
-
-卸载时，在文件管理器中删除安装脚本显示的 `super-paper-reader` 目录即可。已有阅读成品和底稿保存在工作区，不受卸载影响；不再需要的备份可单独处理。
+1. **提取与测绘**——`extract_paper.py` 得到分页文本与章节/图表/公式清单，再核对成证据清单。
+2. **拿到图的真实结构**——`render_pages.py` 渲染页图给模型看；不能看图时用 `figure_map.py`
+   从 PDF 对象里恢复图内文字与位置。
+3. **逐节起草**——按论文原始标题顺序写，方法重就先把方法与实验写完，再校准背景章节。
+4. **覆盖与保真核对**——`check_coverage.py` 找出漏讲的图表公式，再过一遍 QA 清单。
+5. **交付**——写出 `.md`，并在回复里报告字数与覆盖统计（图 x/y、公式 x/y）。
 
 ## 仓库结构
 
 ```text
-super-paper-reader/
-├── README.md
-├── LICENSE
-├── scripts/                       # 跨平台安装及安装测试
-├── examples/render-demo.md         # 最小渲染示例
-├── .github/workflows/ci.yml
-└── skills/super-paper-reader/
-    ├── SKILL.md                   # 技能入口
-    ├── agents/openai.yaml         # Codex界面元数据；DSH无需依赖
-    ├── references/                # 写法、证据、HTML与验收规范
-    ├── scripts/                   # 渲染入口、测试和离线bundle
-    └── licenses/                  # 项目与第三方许可
+skills/super-paper-reader/
+├── SKILL.md                  # 技能主体：公式硬性原则、不可协商规则、字数预算、五阶段流程
+├── references/               # 10 份细则：风格、逐节结构、图表与公式讲法、领域适配、QA 清单
+├── assets/script-template.md # 填空式讲稿脚手架
+└── scripts/                  # 4 个 Python 脚本（提取 / 渲染 / 图表测绘 / 覆盖核对）
+scripts/install.mjs           # 安装器，只支持 DSH
+scripts/test-install.mjs      # 安装器测试
 ```
 
-## 许可证与来源
+细则里最常用的几份：[风格指南](skills/super-paper-reader/references/style-guide.md)、
+[逐节结构模板](skills/super-paper-reader/references/structure-template.md)、
+[图表与公式讲法](skills/super-paper-reader/references/narrating-visuals.md)、
+[交付前 QA 清单](skills/super-paper-reader/references/qa-checklist.md)。
 
-本项目新增代码和文档采用 [MIT](LICENSE)。离线渲染器基于 [Answer me with HTML](https://github.com/QingYunA/answer-me-with-html)，其上游许可与内嵌依赖许可完整保留，见 [第三方说明](skills/super-paper-reader/licenses/NOTICE.md)。
-
-公开包不包含私人风格范本、论文全文或原图，也不包含作者电脑路径、凭据和实际阅读输出。生成时使用的论文和图片保留原作者权利。
-
-作者：[Chao Tan · chaotan2003](https://github.com/chaotan2003)。
-
-## 发布到 GitHub（维护者）
-
-在 `chaotan2003` 账号下创建名为 `super-paper-reader` 的空仓库，然后在本仓库根目录执行：
+## 自检
 
 ```bash
-git init -b main
-git add .
-git commit -m "Initial release of super-paper-reader"
-git remote add origin https://github.com/chaotan2003/super-paper-reader.git
-git push -u origin main
+npm test                                   # 安装器测试 + 文档内链检查
+python3 -m py_compile skills/super-paper-reader/scripts/*.py
 ```
 
-本地已经初始化或配置过 `origin` 时，跳过对应命令。上传的是整个仓库；需要单独复制安装时，只复制 `skills/super-paper-reader/`。实际阅读输出和渲染状态已在 `.gitignore` 中排除。跨平台 CI 会在上传后运行，检查结果可在仓库 Actions 页面查看。
+## 版本说明
+
+仓库早期版本是一个 Codex + DSH 双宿主、输出 HTML 的讲解 skill（自带离线数学渲染器）。
+现在这个仓库改为**只支持 DSH、输出 Markdown 讲稿**的 Super Paper Reader；旧版本的代码与
+许可证文件仍在 git 历史里，需要时可以取回。想要网页版输出，请配合 `paper-lecture-html`
+skill 使用同一份讲稿底稿。
+
+## 许可
+
+MIT，见 [LICENSE](LICENSE)。

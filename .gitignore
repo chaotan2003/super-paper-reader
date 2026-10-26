@@ -1,16 +1,16 @@
-# Reading results and renderer state stay local.
+# Lecture scripts produced while using the skill stay local.
 outputs/
-**/.paper-reading-renderer/
-examples/*.html
+讲解稿/
 node_modules/
 .DS_Store
 Thumbs.db
 __pycache__/
 *.pyc
-# Local agent configuration and credentials are not part of this repository.
+# Local agent configuration, installer backups and credentials are not part of this repository.
 .codex/
 .dsh/
 .agents/
+.super-paper-reader-backups/
 .env
 .env.*
 !.env.example

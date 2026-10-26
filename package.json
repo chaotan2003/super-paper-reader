@@ -1,15 +1,13 @@
 {
   "name": "super-paper-reader",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Source-grounded Chinese paper explainers for Codex and DeepSeek Harness",
+  "description": "Long-form Chinese paper lecture scripts (论文讲解稿) for DeepSeek Harness",
   "license": "MIT",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "node scripts/test-install.mjs && node skills/super-paper-reader/scripts/test-render.mjs",
-    "install:codex": "node scripts/install.mjs --target codex",
-    "install:dsh": "node scripts/install.mjs --target dsh",
-    "install:both": "node scripts/install.mjs --target both",
-    "demo": "node skills/super-paper-reader/scripts/render.mjs examples/render-demo.md"
+    "test": "node scripts/test-install.mjs",
+    "install:skill": "node scripts/install.mjs",
+    "install:dry": "node scripts/install.mjs --dry-run"
   }
 }
